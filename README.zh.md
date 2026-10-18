@@ -12,7 +12,9 @@
 
 ## 它做什么
 
-插件激活时会把 `reasoningEfforts` 写进 `llm-pi-ai` 条目的每个模型，选择器立刻出现这些档位。不用重启，也不用改你的模型列表。
+插件会把 `reasoningEfforts` 写进 `llm-pi-ai` 条目的每个模型，选择器立刻出现这些档位。不用重启，也不用改你的模型列表。
+
+**它会一直跟着配置走。** 激活时写一次，之后每次 profile 配置重载（在设置里新加一个中转站、加一个模型、改一条路由）都会再检查一遍并补上缺的档位。所以你在设置界面里接入一个新 API，它的模型会自动拿到思考等级，不用重启 DSH。
 
 ## 为什么是这五档
 
@@ -60,7 +62,7 @@ plugin_manager install_bundle → <本仓库路径>
         target: llm-pi-ai                 # 要配置的 profile 条目 id
         providers: []                     # 空 = 该条目下所有 provider
         levels: [off, low, medium, high, max]  # 要提供的档位（自动按升序排列）
-        force: false                      # true = 即使已经正确也重写
+        force: false                      # true = 激活时即使已经正确也重写一次
         debugLog: ""                      # 可选：诊断日志文件路径
 ```
 
@@ -76,17 +78,21 @@ levels: [off, low, medium, high]
 
 ## 幂等
 
-如果每个模型都已经是配置的那几档，重跑不会改动任何东西。所以更新插件不会反复折腾你的配置；手工留下的其它档位声明也会被识别并改写。
+如果每个模型都已经是配置的那几档，检查一次就结束，不会写任何东西。所以更新插件、以及插件自己写入后触发的那次配置重载，都不会反复折腾你的配置；手工留下的其它档位声明也会被识别并改写。
 
 改动 `levels` 会重写受影响的模型，因为现有声明已经对不上。
 
+`force: true` 只在插件激活时生效（重写一次，包括已经正确的声明）；之后的重载不会因为 `force` 再写一遍，否则会和配置重载互相触发、来回刷新。
+
 ## 实现要点
 
-读源码时有两个细节值得知道。
+读源码时有三个细节值得知道。
 
 **它不覆盖 `llm-pi-ai` 行。** Cordis 的 loader patch 是整体替换该行的 `config`，而不是合并，所以用 patch 加 `reasoningEfforts` 会把 `baseURL`、密钥引用和整个模型列表冲掉。插件改用 `settings.mutate()` 做路径级写入，只碰 `providers.<name>.models[i].reasoningEfforts` 一个字段。
 
-**它在激活事务之外写入。** HMR 配置编辑器拒绝嵌套事务，而它的守卫读的是 `AsyncLocalStorage`，该上下文会跨 await 和 timer 传播，所以单纯延后无效。插件会等 Loader 稳定后，通过 `hmr.executing.exit()` 在无事务上下文中执行写入——这也正是 `dsh-hmr` 自己在事务中接 watcher 时用的机制。
+**它在事务之外写入。** HMR 配置编辑器拒绝嵌套事务，而它的守卫读的是 `AsyncLocalStorage`，该上下文会跨 await 和 timer 传播，所以单纯延后无效。插件通过 `hmr.executing.exit()` 在无事务上下文中执行写入——这也正是 `dsh-hmr` 自己在事务中接 watcher 时用的机制。
+
+**它监听 `app-boot/config-reload`。** 每一次成功的配置重载都会发这个事件（包括设置界面里加中转站、加模型）。插件在事件后稍等片刻再检查一遍，写完后自身触发的重载只会看到"已经正确"而结束，不会形成循环；重复事件会合并成一次检查。
 
 ## 兼容性
 

@@ -12,7 +12,9 @@ Declaring those levels by hand means repeating seven lines for every model — a
 
 ## What this plugin does
 
-On activation it writes `reasoningEfforts` into the `llm-pi-ai` profile entry for every model on the configured providers, and the picker immediately offers those levels. No restart, and no editing of your model list.
+It writes `reasoningEfforts` into the `llm-pi-ai` profile entry for every model on the configured providers, and the picker immediately offers those levels. No restart, and no editing of your model list.
+
+**It keeps up with your configuration.** The first pass runs at activation, and every later profile configuration reload — adding a relay or a model from the settings UI, editing a route — runs it again and fills in whatever is missing. A relay you connect while DSH is running gets its levels without a restart.
 
 ## Why these five levels
 
@@ -60,7 +62,7 @@ The plugin row takes an optional config:
         target: llm-pi-ai                 # profile entry id to configure
         providers: []                     # empty = every provider on that entry
         levels: [off, low, medium, high, max]  # published levels, ascending
-        force: false                      # true = rewrite even if already correct
+        force: false                      # true = rewrite once at activation even if already correct
         debugLog: ""                      # optional file path for diagnostics
 ```
 
@@ -76,17 +78,21 @@ Any subset of `off, minimal, low, medium, high, xhigh, max` is accepted; names a
 
 ## Idempotent
 
-Re-running the plugin rewrites nothing when every model already declares exactly the configured levels. Updating the package therefore never churns your configuration, and any leftover declaration from a manual setup is detected and rewritten.
+A pass writes nothing when every model already declares exactly the configured levels; it inspects and stops. Updating the package, and the configuration reload caused by the plugin's own write, therefore never churn your configuration, and any leftover declaration from a manual setup is detected and rewritten.
 
 Changing `levels` does rewrite the affected models, because their current declaration no longer matches.
 
+`force: true` is honoured at activation only — it rewrites once, including declarations that are already correct. Later reloads ignore it, because honouring it every time would rewrite the same declaration and reload in a loop.
+
 ## How it works
 
-Two details are worth knowing if you read the source.
+Three details are worth knowing if you read the source.
 
 **It does not override the `llm-pi-ai` row.** A Cordis loader patch replaces a row's `config` wholesale rather than merging it, so a patch that added `reasoningEfforts` would erase `baseURL`, the credential reference, and the whole model list. The plugin instead calls `settings.mutate()` with path-scoped operations, touching only `providers.<name>.models[i].reasoningEfforts`.
 
-**It writes outside the activation transaction.** The HMR config editor refuses to nest transactions, and its guard reads an `AsyncLocalStorage` store that survives awaits and timers, so deferring is not enough. The plugin waits for the Loader to settle, then runs the write through `hmr.executing.exit()` — the same mechanism `dsh-hmr` uses when wiring a config watcher from inside a transaction.
+**It writes outside the transaction.** The HMR config editor refuses to nest transactions, and its guard reads an `AsyncLocalStorage` store that survives awaits and timers, so deferring is not enough. The plugin runs the write through `hmr.executing.exit()` — the same mechanism `dsh-hmr` uses when wiring a config watcher from inside a transaction.
+
+**It listens to `app-boot/config-reload`.** Every successful profile reload emits that event — including a relay added from the settings UI. The plugin inspects once shortly afterwards; a reload caused by its own write only finds everything already correct and stops, so there is no loop, and a burst of events collapses into one inspection.
 
 ## Compatibility
 
