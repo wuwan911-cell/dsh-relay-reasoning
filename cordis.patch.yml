@@ -1,0 +1,7 @@
+- insert:
+    - id: relay-reasoning
+      name: dsh-relay-reasoning
+      config:
+        target: llm-pi-ai
+        providers: []
+        force: false

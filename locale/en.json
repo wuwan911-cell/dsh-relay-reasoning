@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Relay Reasoning Effort",
+    "description": "Adds off / low / medium / high reasoning levels to every model on your OpenAI-compatible relay routes, using the levels the relay actually honors."
+  }
+}
