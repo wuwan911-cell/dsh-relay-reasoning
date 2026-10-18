@@ -1,7 +1,7 @@
 {
   "name": "dsh-relay-reasoning",
-  "version": "1.2.0",
-  "description": "Give every model on an OpenAI-compatible relay four real reasoning levels (off / low / medium / high) in the DSH model picker.",
+  "version": "1.3.0",
+  "description": "Give every model on an OpenAI-compatible relay real reasoning levels (off / low / medium / high, plus opt-in max) in the DSH model picker.",
   "keywords": [
     "dsh",
     "dsh-plugin",

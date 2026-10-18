@@ -7,35 +7,52 @@
  * levels for a model whose `reasoningEfforts` field declares them, so a route
  * configured by hand shows no reasoning control at all.
  *
- * This plugin declares four levels — off / low / medium / high — on every model
- * of the configured relay routes by writing `reasoningEfforts` through the
- * settings service, which performs a path-scoped merge. That matters: a Cordis
- * loader patch replaces a row's `config` wholesale, so overriding the
- * `llm-pi-ai` row to add this field would erase its `baseURL`, credential
- * reference, and model list. Writing through `settings.mutate` touches only the
- * one property per model.
+ * This plugin declares reasoning levels on every model of the configured relay
+ * routes by writing `reasoningEfforts` through the settings service, which
+ * performs a path-scoped merge. That matters: a Cordis loader patch replaces a
+ * row's `config` wholesale, so overriding the `llm-pi-ai` row to add this field
+ * would erase its `baseURL`, credential reference, and model list. Writing
+ * through `settings.mutate` touches only the one property per model.
  *
- * Why four levels and not the seven pi-ai understands: the levels `minimal`,
- * `xhigh`, and `max` are accepted by the relay but do not change how much it
- * actually thinks, so offering them would present duplicate choices. Measured
- * on a relay route over a counting prompt, reasoning-token counts were 0 for
- * off and rose through low/medium/high, while minimal, xhigh, and max landed in
- * the same band as high. Only those four produce distinct behavior.
+ * Which levels: the default is off / low / medium / high, and `max` is offered
+ * on request through the `levels` option. pi-ai understands seven levels, but a
+ * relay does not distinguish all of them. Measured over three prompts and two
+ * passes on one relay route, median reasoning tokens were 0 for off, ~108-155
+ * for minimal through xhigh, and 359 for max: max is a genuinely stronger tier,
+ * while the five middle levels sit inside each other's noise. Those five are
+ * therefore not published by default, since they would only duplicate choices.
  *
- * The apply step is idempotent: re-running it rewrites the same four levels and
+ * The apply step is idempotent: re-running it rewrites the same levels and
  * leaves any model that already declares exactly them untouched. Updating this
  * package therefore does not require re-entering any configuration.
  */
 
 import { appendFileSync } from 'node:fs';
 
-/** The levels the relay actually honors, ascending. `off` is the empty wire value. */
-const LEVELS = [
+/**
+ * The levels to publish. `off` is the empty wire value. `max` is a real tier on
+ * relays that honor it, so it is offered on request; `minimal` and `xhigh` are
+ * accepted by relays but measure the same as the levels around them, so they
+ * stay out by default.
+ */
+const DEFAULT_LEVELS = ['off', 'low', 'medium', 'high'];
+
+/** Every level pi-ai knows, in ascending order, with the wire spelling to send. */
+const ALL_LEVELS = [
   ['off', null],
+  ['minimal', 'minimal'],
   ['low', 'low'],
   ['medium', 'medium'],
   ['high', 'high'],
+  ['xhigh', 'xhigh'],
+  ['max', 'max'],
 ];
+
+/** Narrow ALL_LEVELS down to the named levels, preserving ascending order. */
+function selectedLevels(names) {
+  const want = new Set(names);
+  return ALL_LEVELS.filter(([level]) => want.has(level));
+}
 
 /**
  * Build the diagnostic sink for one activation. The Host logger is used when it
@@ -59,21 +76,21 @@ function makeDiag(logger, debugLog) {
 }
 
 /** Build the reasoningEfforts object for one model. */
-function efforts() {
+function efforts(levels) {
   const out = {};
-  for (const [level, wire] of LEVELS) out[level] = wire;
+  for (const [level, wire] of levels) out[level] = wire;
   return out;
 }
 
 /**
- * Whether a model entry already carries exactly the four levels this plugin
- * declares. A model declaring anything else is rewritten.
+ * Whether a model entry already carries exactly the levels to publish. A model
+ * declaring anything else is rewritten.
  */
-function alreadyDeclared(value) {
+function alreadyDeclared(value, levels) {
   if (value === false || value === null || typeof value !== 'object') return false;
   const keys = Object.keys(value);
-  if (keys.length !== LEVELS.length) return false;
-  for (const [level, wire] of LEVELS) {
+  if (keys.length !== levels.length) return false;
+  for (const [level, wire] of levels) {
     if (!Object.prototype.hasOwnProperty.call(value, level)) return false;
     if ((value[level] ?? null) !== wire) return false;
   }
@@ -92,6 +109,12 @@ export function apply(ctx, config) {
   const providers = Array.isArray(config?.providers) ? config.providers : [];
   const force = config?.force ?? false;
   const debugLog = config?.debugLog;
+  // An explicit level list replaces the default; unknown names are dropped.
+  const requested = Array.isArray(config?.levels) && config.levels.length > 0
+    ? selectedLevels(config.levels.map(String))
+    : selectedLevels(DEFAULT_LEVELS);
+  const levels = requested.length > 0 ? requested : selectedLevels(DEFAULT_LEVELS);
+  const levelNames = levels.map(([level]) => level).join('/');
 
   ctx.inject(['settings'], (child) => {
     const diag = makeDiag(child.logger ?? ctx.logger, debugLog);
@@ -127,11 +150,11 @@ export function apply(ctx, config) {
           for (let index = 0; index < models.length; index += 1) {
             const model = models[index];
             if (model === null || typeof model !== 'object') continue;
-            if (!force && alreadyDeclared(model.reasoningEfforts)) continue;
+            if (!force && alreadyDeclared(model.reasoningEfforts, levels)) continue;
             ops.push({
               op: 'set',
               path: ['providers', providerName, 'models', String(index), 'reasoningEfforts'],
-              value: efforts(),
+              value: efforts(levels),
             });
           }
         }
@@ -145,7 +168,7 @@ export function apply(ctx, config) {
 
         try {
           await write(entry.revision);
-          diag(`declared off/low/medium/high on ${ops.length} model(s)`);
+          diag(`declared ${levelNames} on ${ops.length} model(s)`);
         } catch (error) {
           if (cancelled) return;
           diag(`mutate failed: ${error?.message ?? error}`);
@@ -154,7 +177,7 @@ export function apply(ctx, config) {
             const retry = settings.describe().find((item) => String(item.ns) === String(entry.ns));
             if (retry !== undefined) {
               await write(retry.revision);
-              diag(`declared off/low/medium/high on ${ops.length} model(s) after retry`);
+              diag(`declared ${levelNames} on ${ops.length} model(s) after retry`);
             }
           } catch (second) {
             diag(`retry failed: ${second?.message ?? second}`);

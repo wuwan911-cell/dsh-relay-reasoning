@@ -12,21 +12,29 @@
 
 ## 它做什么
 
-插件激活时会把 `reasoningEfforts` 写进 `llm-pi-ai` 条目的每个模型，选择器立刻出现四档。不用重启，也不用改你的模型列表。
+插件激活时会把 `reasoningEfforts` 写进 `llm-pi-ai` 条目的每个模型，选择器立刻出现这些档位。不用重启，也不用改你的模型列表。中转站支持时可以把 `max` 一起纳入。
 
-## 为什么是四档，不是七档
+## 为什么默认四档，max 去哪了
 
-pi-ai 认识七档，但中转站只对其中一部分有反应。用一道多步算术题实测：
+pi-ai 认识七档，但中转站并不能把七档都区分开。用三道题、跑两轮测出的各档推理 token 中位数：
 
-| 档位 | 推理 token |
+| 档位 | 推理 token 中位数 |
 |---|---|
 | 关 | 0 |
-| 低 | 482 |
-| 中 | 276 |
-| 高 | 808 |
-| minimal / xhigh / max | 与「高」无法区分 |
+| minimal | 108 |
+| 低 | 122 |
+| 中 | 155 |
+| 高 | 142 |
+| xhigh | 125 |
+| max | 359 |
 
-`minimal`、`xhigh`、`max` 中转站照收，但不会让它想得更多，放进选择器只是重复选项。这个插件只发布真正有区别的四档。
+由此有两点。
+
+`max` 是一个真实更强的档位——大约是其它档的两倍，值得提供。它做成**可选**，因为不是每个中转站都认它；声明一个路由会忽略的档位，只会在选择器里多一个点不动的选项。要开启它，配置 `levels: [off, low, medium, high, max]`。
+
+中间五档（`minimal` 到 `xhigh`）在这条路由上互相落在噪声范围内，放出来只是重复选项，所以默认不提供；如果你的路由确实能区分，可以通过 `levels` 自行指定。
+
+因此默认是 `off / low / medium / high`，你的中转站支持时再加上 `max`。
 
 ## 安装
 
@@ -51,17 +59,28 @@ plugin_manager install_bundle → <本仓库路径>
     - id: relay-reasoning
       name: dsh-relay-reasoning
       config:
-        target: llm-pi-ai     # 要配置的 profile 条目 id
-        providers: []         # 空 = 该条目下所有 provider
-        force: false          # true = 即使已经是四档也重写
-        debugLog: ""          # 可选：诊断日志文件路径
+        target: llm-pi-ai              # 要配置的 profile 条目 id
+        providers: []                  # 空 = 该条目下所有 provider
+        levels: [off, low, medium, high]  # 要提供的档位（自动按升序排列）
+        force: false                   # true = 即使已经正确也重写
+        debugLog: ""                   # 可选：诊断日志文件路径
 ```
 
 `providers: []` 表示覆盖该条目上所有 provider，所以你以后再加中转站不用改插件。
 
+`levels` 默认是 `off, low, medium, high`。如果中转站支持，加上 `max`：
+
+```yaml
+levels: [off, low, medium, high, max]
+```
+
+`off, minimal, low, medium, high, xhigh, max` 的任意子集都可用；档位会按升序写入，无法识别的名字会被丢弃。
+
 ## 幂等
 
-如果每个模型都已经是这四档，重跑不会改动任何东西。所以更新插件不会反复折腾你的配置；手工留下的七档块也会被识别并改写成四档。
+如果每个模型都已经是配置的那几档，重跑不会改动任何东西。所以更新插件不会反复折腾你的配置；手工留下的其它档位声明也会被识别并改写。
+
+改动 `levels` 会重写受影响的模型，因为现有声明已经对不上。
 
 ## 实现要点
 
