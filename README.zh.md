@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-给你的 OpenAI 兼容中转站的每个模型加上 **关 / 低 / 中 / 高** 四档推理等级，直接出现在 DSH 的模型选择器里。
+给你的 OpenAI 兼容中转站的每个模型加上 **关 / 低 / 中 / 高 / max** 五档推理等级，直接出现在 DSH 的模型选择器里。
 
 ## 为什么需要它
 
@@ -12,9 +12,9 @@
 
 ## 它做什么
 
-插件激活时会把 `reasoningEfforts` 写进 `llm-pi-ai` 条目的每个模型，选择器立刻出现这些档位。不用重启，也不用改你的模型列表。中转站支持时可以把 `max` 一起纳入。
+插件激活时会把 `reasoningEfforts` 写进 `llm-pi-ai` 条目的每个模型，选择器立刻出现这些档位。不用重启，也不用改你的模型列表。
 
-## 为什么默认四档，max 去哪了
+## 为什么是这五档
 
 pi-ai 认识七档，但中转站并不能把七档都区分开。用三道题、跑两轮测出的各档推理 token 中位数：
 
@@ -28,13 +28,11 @@ pi-ai 认识七档，但中转站并不能把七档都区分开。用三道题�
 | xhigh | 125 |
 | max | 359 |
 
-由此有两点。
-
-`max` 是一个真实更强的档位——大约是其它档的两倍，值得提供。它做成**可选**，因为不是每个中转站都认它；声明一个路由会忽略的档位，只会在选择器里多一个点不动的选项。要开启它，配置 `levels: [off, low, medium, high, max]`。
+`max` 大约是其它档的两倍，是真实更强的一档，所以默认提供。
 
 中间五档（`minimal` 到 `xhigh`）在这条路由上互相落在噪声范围内，放出来只是重复选项，所以默认不提供；如果你的路由确实能区分，可以通过 `levels` 自行指定。
 
-因此默认是 `off / low / medium / high`，你的中转站支持时再加上 `max`。
+如果你的中转站其实不认 `max`，用 `levels: [off, low, medium, high]` 去掉它，免得选择器里留一个点不动的档位。
 
 ## 安装
 
@@ -59,19 +57,19 @@ plugin_manager install_bundle → <本仓库路径>
     - id: relay-reasoning
       name: dsh-relay-reasoning
       config:
-        target: llm-pi-ai              # 要配置的 profile 条目 id
-        providers: []                  # 空 = 该条目下所有 provider
-        levels: [off, low, medium, high]  # 要提供的档位（自动按升序排列）
-        force: false                   # true = 即使已经正确也重写
-        debugLog: ""                   # 可选：诊断日志文件路径
+        target: llm-pi-ai                 # 要配置的 profile 条目 id
+        providers: []                     # 空 = 该条目下所有 provider
+        levels: [off, low, medium, high, max]  # 要提供的档位（自动按升序排列）
+        force: false                      # true = 即使已经正确也重写
+        debugLog: ""                      # 可选：诊断日志文件路径
 ```
 
 `providers: []` 表示覆盖该条目上所有 provider，所以你以后再加中转站不用改插件。
 
-`levels` 默认是 `off, low, medium, high`。如果中转站支持，加上 `max`：
+`levels` 默认是 `off, low, medium, high, max`。如果中转站不认某一档，去掉它即可：
 
 ```yaml
-levels: [off, low, medium, high, max]
+levels: [off, low, medium, high]
 ```
 
 `off, minimal, low, medium, high, xhigh, max` 的任意子集都可用；档位会按升序写入，无法识别的名字会被丢弃。

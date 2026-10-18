@@ -5,5 +5,3 @@
         target: llm-pi-ai
         providers: []
         force: false
-        levels: [off, low, medium, high, max]
-        debugLog: "D:\\Deepseek\\gongzuoqu 1\\.build\\relay-reasoning.log"

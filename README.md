@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Four real reasoning levels — **off / low / medium / high** — on every model of your OpenAI-compatible relay, right in the DSH model picker.
+Real reasoning levels — **off / low / medium / high / max** — on every model of your OpenAI-compatible relay, right in the DSH model picker.
 
 ## The problem
 
@@ -12,9 +12,9 @@ Declaring those levels by hand means repeating seven lines for every model — a
 
 ## What this plugin does
 
-On activation it writes `reasoningEfforts` into the `llm-pi-ai` profile entry for every model on the configured providers, and the picker immediately offers those levels. No restart, and no editing of your model list. `max` can be included on any relay that honors it.
+On activation it writes `reasoningEfforts` into the `llm-pi-ai` profile entry for every model on the configured providers, and the picker immediately offers those levels. No restart, and no editing of your model list.
 
-## Why four levels by default, and where `max` went
+## Why these five levels
 
 pi-ai understands seven levels, but a relay does not distinguish all of them. Measured over three prompts and two passes on one relay route, median reasoning tokens per level:
 
@@ -28,13 +28,11 @@ pi-ai understands seven levels, but a relay does not distinguish all of them. Me
 | xhigh | 125 |
 | max | 359 |
 
-Two things follow.
-
-`max` is a genuinely stronger tier — roughly double everything else — so it is worth offering. It is **opt-in** because not every relay honors it, and declaring a level a route ignores would put a dead choice in the picker. Turn it on with `levels: [off, low, medium, high, max]`.
+`max` is roughly double every other level, so it is a genuinely stronger tier and is included by default.
 
 The five middle levels (`minimal` through `xhigh`) land within each other's noise on this route, so publishing them would only duplicate choices. They stay out by default but can be requested through `levels` if a route of yours does distinguish them.
 
-The default is therefore `off / low / medium / high`; add `max` when your relay supports it.
+If your relay turns out to ignore `max`, drop it with `levels: [off, low, medium, high]` so the picker does not offer a level that does nothing.
 
 ## Install
 
@@ -59,19 +57,19 @@ The plugin row takes an optional config:
     - id: relay-reasoning
       name: dsh-relay-reasoning
       config:
-        target: llm-pi-ai              # profile entry id to configure
-        providers: []                  # empty = every provider on that entry
-        levels: [off, low, medium, high]  # published levels, ascending
-        force: false                   # true = rewrite even if already correct
-        debugLog: ""                   # optional file path for diagnostics
+        target: llm-pi-ai                 # profile entry id to configure
+        providers: []                     # empty = every provider on that entry
+        levels: [off, low, medium, high, max]  # published levels, ascending
+        force: false                      # true = rewrite even if already correct
+        debugLog: ""                      # optional file path for diagnostics
 ```
 
 `providers: []` means the plugin covers every provider on the entry, so adding a new relay needs no plugin change.
 
-`levels` defaults to `off, low, medium, high`. Add `max` if your relay honors it:
+`levels` defaults to `off, low, medium, high, max`. Narrow it if your relay ignores a level:
 
 ```yaml
-levels: [off, low, medium, high, max]
+levels: [off, low, medium, high]
 ```
 
 Any subset of `off, minimal, low, medium, high, xhigh, max` is accepted; names are published in ascending order and unknown names are dropped.

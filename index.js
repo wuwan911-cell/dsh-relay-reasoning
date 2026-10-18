@@ -14,13 +14,13 @@
  * would erase its `baseURL`, credential reference, and model list. Writing
  * through `settings.mutate` touches only the one property per model.
  *
- * Which levels: the default is off / low / medium / high, and `max` is offered
- * on request through the `levels` option. pi-ai understands seven levels, but a
- * relay does not distinguish all of them. Measured over three prompts and two
- * passes on one relay route, median reasoning tokens were 0 for off, ~108-155
- * for minimal through xhigh, and 359 for max: max is a genuinely stronger tier,
- * while the five middle levels sit inside each other's noise. Those five are
- * therefore not published by default, since they would only duplicate choices.
+ * Which levels: the default is off / low / medium / high / max, and a narrower or
+ * wider set can be requested through the `levels` option. pi-ai understands
+ * seven levels, but a relay does not distinguish all of them. Measured over
+ * three prompts and two passes on one relay route, median reasoning tokens were
+ * 0 for off, ~108-155 for minimal through xhigh, and 359 for max: max is a
+ * genuinely stronger tier, while the five middle levels sit inside each other's
+ * noise and are therefore left out, since they would only duplicate choices.
  *
  * The apply step is idempotent: re-running it rewrites the same levels and
  * leaves any model that already declares exactly them untouched. Updating this
@@ -30,12 +30,12 @@
 import { appendFileSync } from 'node:fs';
 
 /**
- * The levels to publish. `off` is the empty wire value. `max` is a real tier on
- * relays that honor it, so it is offered on request; `minimal` and `xhigh` are
- * accepted by relays but measure the same as the levels around them, so they
- * stay out by default.
+ * The levels to publish by default. `off` is the empty wire value. `max` is
+ * included because it measures roughly double every other level, so it is a real
+ * tier rather than a duplicate; `minimal` through `xhigh` land inside each
+ * other's noise and stay out, since they would only duplicate choices.
  */
-const DEFAULT_LEVELS = ['off', 'low', 'medium', 'high'];
+const DEFAULT_LEVELS = ['off', 'low', 'medium', 'high', 'max'];
 
 /** Every level pi-ai knows, in ascending order, with the wire spelling to send. */
 const ALL_LEVELS = [
