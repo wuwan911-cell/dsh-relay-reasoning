@@ -30,10 +30,16 @@ pi-ai 认识七档，但中转站只对其中一部分有反应。用一道多�
 
 ## 安装
 
-在 DSH 创意工坊（设置 → 创意工坊 → 插件）里安装，或者：
+在 DSH 创意工坊（设置 → 创意工坊 → 插件）里安装，或者直接：
 
 ```
 plugin_manager install_bundle → dsh-relay-reasoning
+```
+
+开发版也可以直接从本地检出安装：
+
+```
+plugin_manager install_bundle → <本仓库路径>
 ```
 
 ## 配置

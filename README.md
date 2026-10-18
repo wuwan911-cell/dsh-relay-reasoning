@@ -30,10 +30,16 @@ pi-ai understands seven levels, but a relay only reacts to some of them. Measure
 
 ## Install
 
-From the DSH workshop (Settings → Workshop → Plugins), or:
+From the DSH workshop (Settings → Workshop → Plugins), or directly:
 
 ```
 plugin_manager install_bundle → dsh-relay-reasoning
+```
+
+Development builds can also be installed from a checkout:
+
+```
+plugin_manager install_bundle → <path to this repository>
 ```
 
 ## Configuration
